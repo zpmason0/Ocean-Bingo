@@ -487,11 +487,41 @@ function shuffle(arr) {
   return a;
 }
 
+const SAVE_KEY = "oceanBingoState";
+
+function saveState() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      picks: currentPicks,
+      marked: [...marked],
+      celebrated: [...celebratedLines]
+    }));
+  } catch (e) { /* storage unavailable (e.g. preview) — play continues, just won't persist */ }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!Array.isArray(s.picks) || s.picks.length !== 24) return null;
+    return s;
+  } catch (e) {
+    return null;
+  }
+}
+
 function generateBoard() {
   const picks = shuffle(PROMPTS).slice(0, 24);
   currentPicks = picks;
   marked = new Set([FREE_INDEX]);
   celebratedLines = new Set();
+  renderBoard();
+  saveState();
+}
+
+function renderBoard() {
+  const picks = currentPicks;
 
   const board = document.createElement("div");
   board.className = "board";
@@ -521,7 +551,12 @@ function generateBoard() {
       stamp.innerHTML = STAMP_SVG;
       cell.appendChild(stamp);
 
-      cell.setAttribute("aria-pressed", "false");
+      if (marked.has(i)) {
+        cell.classList.add("marked");
+        cell.setAttribute("aria-pressed", "true");
+      } else {
+        cell.setAttribute("aria-pressed", "false");
+      }
       cell.addEventListener("click", () => toggleCell(cell, i));
     }
     board.appendChild(cell);
@@ -545,6 +580,7 @@ function toggleCell(cell, index) {
     cell.setAttribute("aria-pressed", "true");
     checkBingo();
   }
+  saveState();
 }
 
 function lines() {
@@ -609,6 +645,15 @@ function closeGuide() {
 
 generateBtn.addEventListener("click", generateBoard);
 descBtn.addEventListener("click", openGuide);
+
+// Restore a saved board on launch
+const saved = loadState();
+if (saved) {
+  currentPicks = saved.picks;
+  marked = new Set(saved.marked);
+  celebratedLines = new Set(saved.celebrated);
+  renderBoard();
+}
 guideClose.addEventListener("click", closeGuide);
 guideOverlay.addEventListener("click", (e) => {
   if (e.target === guideOverlay) closeGuide();
